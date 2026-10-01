@@ -1,0 +1,49 @@
+name: Populate ZubiSniffer source
+
+on:
+  push:
+    paths:
+      - ".github/workflows/populate-zubisniffer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  populate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ZubiSniffer
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Import full Session Sniffer source
+        shell: bash
+        run: |
+          set -euo pipefail
+          UPSTREAM="$RUNNER_TEMP/session-sniffer"
+          git clone --depth 1 https://github.com/BUZZARDGTA/Session-Sniffer.git "$UPSTREAM"
+
+          # Preserve ZubiSniffer-owned repository files while importing the full
+          # upstream application, resources, tests and build files.
+          rsync -a --delete             --exclude '.git/'             --exclude 'README.md'             --exclude 'CREDITS.md'             --exclude '.github/workflows/populate-zubisniffer.yml'             "$UPSTREAM/" "$GITHUB_WORKSPACE/"
+
+          test -d src
+          test -f pyproject.toml
+          test -f LICENSE
+
+      - name: Commit imported source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ZubiSniffer Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Repository is already populated."
+            exit 0
+          fi
+          git commit -m "Import full ZubiSniffer source baseline"
+          git push
